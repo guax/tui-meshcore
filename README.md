@@ -1,5 +1,7 @@
 # tui-meshcore
 
+![TUI Meshcore](tui-meshcore-screenshot.png)
+
 A terminal-based chat client for **meshcore** LoRa mesh networks, built with [Textual](https://textual.textualize.io/) and [pyMC_core](https://github.com/meshcore/pyMC_core).
 
 ## Features
