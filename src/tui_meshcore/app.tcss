@@ -1,0 +1,88 @@
+/* tui-meshcore global styles */
+
+Screen {
+    background: $background;
+}
+
+/* Sidebar sections */
+.section-title {
+    padding: 1 0 0 0;
+    text-style: bold;
+    color: $accent;
+}
+
+#status-bar {
+    height: auto;
+    padding: 1 0;
+    border-bottom: solid $primary-background;
+    margin: 0 0 1 0;
+}
+
+/* Chat area */
+#chat-area {
+    width: 1fr;
+}
+
+#chat-header {
+    height: 3;
+    padding: 1 2;
+    background: $primary-background;
+    color: $text;
+    text-style: bold;
+}
+
+#message-list {
+    height: 1fr;
+    padding: 1 1;
+}
+
+#msg-input {
+    dock: bottom;
+    margin: 0 1 1 1;
+}
+
+/* Sidebar */
+Sidebar {
+    width: 30;
+    dock: left;
+    background: $surface;
+    border-right: solid $primary-background;
+    padding: 0 1;
+}
+
+Sidebar ChannelList,
+Sidebar ContactList {
+    height: auto;
+    max-height: 40%;
+    background: $surface;
+}
+
+Sidebar ChannelList > ListItem,
+Sidebar ContactList > ListItem {
+    padding: 0 1;
+}
+
+Sidebar ChannelList > ListItem:hover,
+Sidebar ContactList > ListItem:hover {
+    background: $primary-background;
+}
+
+/* Message bubbles */
+MessageBubble {
+    width: 100%;
+    padding: 0 1;
+    margin: 0 0 0 0;
+}
+
+MessageBubble.me {
+    color: $success;
+}
+
+MessageBubble.other {
+    color: $text;
+}
+
+MessageBubble.system {
+    color: $warning;
+    text-style: italic;
+}
