@@ -58,6 +58,7 @@ class MeshCoreApp(App):
         ("ctrl+j", "join_channel", "Join Channel"),
         ("ctrl+l", "leave_channel", "Leave Channel"),
         ("ctrl+n", "add_contact", "Add Contact"),
+        ("ctrl+a", "send_advert", "Send Advert"),
     ]
 
     def __init__(self) -> None:
@@ -304,6 +305,19 @@ class MeshCoreApp(App):
         self.db.upsert_contact(event.node_id, name=event.name)
         self._refresh_sidebar()
         self.notify(f"Added contact: {event.name}")
+
+    # --- send advert -------------------------------------------------------
+
+    def action_send_advert(self) -> None:
+        asyncio.create_task(self._do_send_advert())
+
+    async def _do_send_advert(self) -> None:
+        screen = self._main_screen
+        ok = await self.mesh.send_advert()
+        if ok:
+            screen.message_list.add_system("Advert sent.")
+        else:
+            screen.message_list.add_system("Failed to send advert.")
 
     # --- channel / config sync ---------------------------------------------
 

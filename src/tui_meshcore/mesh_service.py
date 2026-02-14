@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from dataclasses import dataclass, field
 from typing import Any, Optional, TYPE_CHECKING
 
 from .config import ConfigManager
@@ -34,6 +35,54 @@ class ChannelDBAdapter:
 
     def set_channels(self, channels: list[dict[str, str]]) -> None:
         self._channels = list(channels)
+
+
+# ---------------------------------------------------------------------------
+# Contact adapter: wraps TUI DB rows into objects pyMC_core expects
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Contact:
+    """Lightweight contact object matching the interface pyMC_core handlers use."""
+    public_key: str = ""
+    name: str = ""
+    out_path: list[int] = field(default_factory=list)
+    type: int = 0
+
+
+class ContactDBAdapter:
+    """Exposes DB contacts as `.contacts` list + `.get_by_name()` for pyMC_core."""
+
+    def __init__(self, db: DatabaseManager) -> None:
+        self._db = db
+        self.contacts: list[Contact] = []
+        self.refresh()
+
+    def refresh(self) -> None:
+        """Re-read contacts from the database."""
+        self.contacts = [
+            Contact(
+                public_key=row.get("public_key") or "",
+                name=row.get("name") or row.get("node_id", ""),
+            )
+            for row in self._db.get_contacts()
+            if row.get("public_key")
+        ]
+
+    def get_by_name(self, name: str) -> Optional[Contact]:
+        for c in self.contacts:
+            if c.name == name:
+                return c
+        return None
+
+    def add_contact(self, public_key: str, name: str) -> Contact:
+        """Add a contact to the DB *and* the in-memory list. Returns the new Contact."""
+        self._db.upsert_contact(public_key, name=name, public_key=public_key)
+        c = Contact(public_key=public_key, name=name)
+        # Avoid duplicates in the in-memory list
+        if not any(existing.public_key == public_key for existing in self.contacts):
+            self.contacts.append(c)
+        return c
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +126,7 @@ class MeshService:
         self.identity: Any = None
         self.node: Any = None
         self._app: Optional[App] = None
+        self._contact_db: Optional[ContactDBAdapter] = None
         self._node_task: Optional[asyncio.Task[None]] = None
         self._event_service: Any = None
         self._bridge: Optional[_TuiEventBridge] = None
@@ -131,10 +181,12 @@ class MeshService:
                 from pymc_core.node.node import MeshNode
                 channels_cfg = self.config.get_channels()
                 channel_db = ChannelDBAdapter(channels_cfg)
+                self._contact_db = ContactDBAdapter(self.db)
                 self.node = MeshNode(
                     radio=self.radio,
                     local_identity=self.identity,
                     config=self.config.data,
+                    contacts=self._contact_db,
                     channel_db=channel_db,
                     event_service=self._event_service,
                 )
@@ -186,6 +238,27 @@ class MeshService:
             logger.exception("send_direct_message failed")
             return False
 
+    # --- advertise ---------------------------------------------------------
+
+    async def send_advert(self) -> bool:
+        """Broadcast a self-advertisement packet announcing this node."""
+        if not self.node:
+            logger.warning("Cannot send advert — node not initialised")
+            return False
+        try:
+            from pymc_core.protocol.packet_builder import PacketBuilder
+
+            pkt = PacketBuilder.create_self_advert(
+                local_identity=self.identity,
+                name=self.config.node_name,
+            )
+            success = await self.node.dispatcher.send_packet(pkt, wait_for_ack=False)
+            logger.info("Advert sent: %s", success)
+            return success
+        except Exception:
+            logger.exception("send_advert failed")
+            return False
+
     # --- internals ---------------------------------------------------------
 
     async def on_packet(self, pkt):
@@ -204,14 +277,19 @@ class MeshService:
 
         try:
             from pymc_core.protocol.constants import (
+                PAYLOAD_TYPE_ADVERT,
                 PAYLOAD_TYPE_GRP_TXT,
                 PAYLOAD_TYPE_TXT_MSG,
             )
         except ImportError:
             return
 
+        # -- advertisement --------------------------------------------------
+        if payload_type == PAYLOAD_TYPE_ADVERT:
+            self._handle_advert(pkt)
+
         # -- group / channel message ----------------------------------------
-        if payload_type == PAYLOAD_TYPE_GRP_TXT:
+        elif payload_type == PAYLOAD_TYPE_GRP_TXT:
             grp = pkt.decrypted.get("group_text_data")
             if not grp:
                 return
@@ -232,8 +310,8 @@ class MeshService:
             txt = pkt.decrypted.get("text")
             if not txt:
                 return
-            # The text handler only stores {"text": msg} on the packet.
-            # Resolve the sender from src_hash (payload byte 1) via the DB.
+            # The text handler matched the contact from _contact_db to decrypt.
+            # Resolve the sender so we can attribute the message.
             contact_name, contact_pubkey = self._resolve_sender(pkt)
             self._app.post_message(
                 MeshEvent(
@@ -246,17 +324,73 @@ class MeshService:
                 )
             )
 
+    # --- contact helpers ---------------------------------------------------
+
+    def _handle_advert(self, pkt) -> None:
+        """Process an advert packet — auto-add the sender as a contact if new."""
+        from .app import MeshEvent
+
+        try:
+            from pymc_core.protocol.constants import PUB_KEY_SIZE, TIMESTAMP_SIZE, SIGNATURE_SIZE
+            from pymc_core.protocol import decode_appdata
+        except ImportError:
+            return
+
+        payload = pkt.get_payload()
+        header_len = PUB_KEY_SIZE + TIMESTAMP_SIZE + SIGNATURE_SIZE
+        if len(payload) < header_len:
+            return
+
+        pubkey_hex = payload[:PUB_KEY_SIZE].hex()
+        appdata = payload[header_len:]
+
+        try:
+            decoded = decode_appdata(appdata)
+        except Exception:
+            logger.debug("Failed to decode advert appdata")
+            return
+
+        name = decoded.get("node_name") or decoded.get("name") or ""
+        if not name:
+            return
+
+        # Ensure the contact exists in our DB and in-memory adapter
+        self._ensure_contact(pubkey_hex, name)
+
+        self._app.post_message(
+            MeshEvent(
+                "mesh.contact.new",
+                {"node_id": pubkey_hex, "name": name, "public_key": pubkey_hex},
+            )
+        )
+
+    def _ensure_contact(self, public_key: str, name: str) -> None:
+        """Add the contact to the DB + adapter if not already known, and refresh sidebar."""
+        if self._contact_db is None:
+            return
+        existing = next(
+            (c for c in self._contact_db.contacts if c.public_key == public_key),
+            None,
+        )
+        if existing is None:
+            self._contact_db.add_contact(public_key, name)
+            logger.info("Auto-added contact %s (%s…)", name, public_key[:16])
+        else:
+            # Update name if it changed
+            if name and existing.name != name:
+                existing.name = name
+                self.db.upsert_contact(public_key, name=name, public_key=public_key)
+
     def _resolve_sender(self, pkt) -> tuple[str, str]:
         """Look up the sender's name and public key from the packet src_hash."""
-        if len(pkt.payload) < 2:
+        if not self._contact_db or len(pkt.payload) < 2:
             return ("?", "")
         src_hash = pkt.payload[1]
-        for contact in self.db.get_contacts():
-            pk = contact.get("public_key", "")
-            if pk:
+        for c in self._contact_db.contacts:
+            if c.public_key:
                 try:
-                    if bytes.fromhex(pk)[0] == src_hash:
-                        return (contact.get("name") or pk[:16], pk)
+                    if bytes.fromhex(c.public_key)[0] == src_hash:
+                        return (c.name or c.public_key[:16], c.public_key)
                 except (ValueError, IndexError):
                     continue
         return (f"unknown-{src_hash:02X}", "")

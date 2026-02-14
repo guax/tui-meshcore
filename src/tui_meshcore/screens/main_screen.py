@@ -32,6 +32,7 @@ class MainScreen(Screen):
         ("ctrl+j", "app.join_channel", "Join Channel"),
         ("ctrl+l", "app.leave_channel", "Leave Channel"),
         ("ctrl+n", "app.add_contact", "Add Contact"),
+        ("ctrl+a", "app.send_advert", "Send Advert"),
     ]
 
     DEFAULT_CSS = """

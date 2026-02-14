@@ -38,6 +38,7 @@ On first launch the onboarding wizard will guide you through setup. Configuratio
 | `Ctrl+Q` | Quit |
 | `Ctrl+J` | Join channel |
 | `Ctrl+L` | Leave channel |
+| `Ctrl+A` | Send advert |
 | `Enter` | Send message |
 
 ## Configuration
