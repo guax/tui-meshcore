@@ -10,19 +10,21 @@ A terminal-based chat client for **meshcore** LoRa mesh networks, built with [Te
 - **Persistent history** — SQLite-backed message and contact storage
 - **Hardware presets** — uConsole AIOv2, Waveshare HAT, Mock Radio
 - **15 regional presets** — EU, US/CA, AU, NZ, and more
-- **Mock radio mode** — full UI testing without LoRa hardware
 
 ## Quick Start
 
 ```bash
-# Install (editable, no radio hardware needed)
+# Install
 pip install -e .
-
-# Install with real radio support
-pip install -e ".[radio]"
 
 # Run
 tui-meshcore
+
+# or
+python -m tui_meshcore.app
+
+# sometimes you have to specify python3
+python3 -m tui_meshcore.app
 ```
 
 On first launch the onboarding wizard will guide you through setup. Configuration is stored in `~/.config/tui-meshcore/`.
@@ -33,26 +35,8 @@ On first launch the onboarding wizard will guide you through setup. Configuratio
 |---|---|
 | `Ctrl+Q` | Quit |
 | `Ctrl+J` | Join channel |
+| `Ctrl+L` | Leave channel |
 | `Enter` | Send message |
-
-## Project Layout
-
-```
-src/tui_meshcore/
-├── app.py            # Main Textual app + entry point
-├── app.tcss          # Global CSS styles
-├── config.py         # ConfigManager, hardware/region presets
-├── database.py       # SQLite persistence
-├── identity.py       # Keypair generation/loading
-├── mesh_service.py   # MeshNode wrapper + event bridge
-├── mock_radio.py     # Fake radio for testing
-├── screens/
-│   ├── main_screen.py    # Chat UI
-│   └── onboarding.py     # First-run wizard
-└── widgets/
-    ├── sidebar.py         # Channels + contacts + status
-    └── message_list.py    # Scrollable chat history
-```
 
 ## Configuration
 
@@ -90,4 +74,4 @@ channels:
 
 ## License
 
-MIT
+GPLv3
