@@ -284,3 +284,70 @@ class AddContactDialog(ModalScreen):
 
         self.post_message(AddContactResult(node_id, name))
         self.app.pop_screen()
+
+
+
+# ---------------------------------------------------------------------------
+# Remove Contact
+# ---------------------------------------------------------------------------
+
+class RemoveContactResult(Message):
+    def __init__(self, name: str) -> None:
+        super().__init__()
+        self.name = name
+
+
+class RemoveContactDialog(ModalScreen):
+    """Confirmation dialog for removing a contact."""
+
+    DEFAULT_CSS = """
+    RemoveContactDialog {
+        align: center middle;
+    }
+    #remove-box {
+        width: 48;
+        padding: 2 3;
+        border: thick $error;
+        background: $surface;
+    }
+    .dialog-title {
+        text-align: center;
+        text-style: bold;
+        color: $error;
+        margin: 0 0 1 0;
+    }
+    .confirm-text {
+        text-align: center;
+        margin: 0 0 1 0;
+    }
+    .button-row {
+        layout: horizontal;
+        height: auto;
+        margin: 1 0 0 0;
+    }
+    .button-row Button {
+        width: 1fr;
+        margin: 0 1;
+    }
+    """
+
+    def __init__(self, contact_node_id: str) -> None:
+        super().__init__()
+        self._contact_node_id = contact_node_id
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="remove-box"):
+            yield Static("Remove Contact", classes="dialog-title")
+            yield Static(
+                f"Remove [bold]{self._contact_node_id}[/]?\nMessage history will be kept.",
+                classes="confirm-text",
+            )
+            with Vertical(classes="button-row"):
+                yield Button("Remove", variant="error", id="btn-remove")
+                yield Button("Cancel", variant="default", id="btn-cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-remove":
+            self.post_message(RemoveContactResult(self._contact_node_id))
+        self.app.pop_screen()
+
