@@ -318,7 +318,7 @@ class MeshCoreApp(App):
         self.push_screen(RemoveContactDialog(target))
 
     def on_remove_contact_result(self, event: RemoveContactResult) -> None:
-        self.db.remove_contact(event.public_key)
+        self.db.remove_contact(event.name)
         self._refresh_sidebar()
         # Clear chat view if we were viewing that channel
         screen = self._main_screen
@@ -326,7 +326,7 @@ class MeshCoreApp(App):
             screen._current_target = ""
             screen.query_one("#chat-header").update("Select a channel or contact")
             screen.message_list.clear_messages()
-        self.notify(f"Removed contact: {event.name} ({event.public_key})")
+        self.notify(f"Removed contact: {event.name}")
 
     
 
