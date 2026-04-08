@@ -318,10 +318,10 @@ class MeshCoreApp(App):
         self.push_screen(RemoveContactDialog(target))
 
     def on_remove_contact_result(self, event: RemoveContactResult) -> None:
+        screen = self._main_screen
         self.db.remove_contact(screen.current_contact_id)
         self._refresh_sidebar()
         # Clear chat view if we were viewing that channel
-        screen = self._main_screen
         if screen.current_target == event.name and screen.is_dm:
             screen._current_target = ""
             screen.query_one("#chat-header").update("Select a channel or contact")
