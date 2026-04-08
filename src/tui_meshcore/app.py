@@ -17,6 +17,8 @@ from .mesh_service import MeshService
 from .screens.dialogs import (
     AddContactDialog,
     AddContactResult,
+    RemoveContactDialog,
+    RemoveContactResult,
     JoinChannelDialog,
     JoinChannelResult,
     LeaveChannelDialog,
@@ -58,6 +60,7 @@ class MeshCoreApp(App):
         ("ctrl+j", "join_channel", "Join Channel"),
         ("ctrl+l", "leave_channel", "Leave Channel"),
         ("ctrl+n", "add_contact", "Add Contact"),
+        ("ctrl+r", "remove_contact", "Remove Contact"),
         ("ctrl+a", "send_advert", "Send Advert"),
     ]
 
@@ -296,7 +299,7 @@ class MeshCoreApp(App):
             screen.message_list.clear_messages()
         self.notify(f"Left channel: {event.name}")
 
-    # --- add contact action ------------------------------------------------
+    # --- add / remove contact actions ------------------------------------
 
     def action_add_contact(self) -> None:
         self.push_screen(AddContactDialog())
@@ -305,6 +308,27 @@ class MeshCoreApp(App):
         self.db.upsert_contact(event.node_id, name=event.name)
         self._refresh_sidebar()
         self.notify(f"Added contact: {event.name}")
+
+    def action_remove_contact(self) -> None:
+        screen = self._main_screen
+        target = screen.current_target
+        if not target or not screen.is_dm:
+            self.notify("Select a contact first.", severity="warning")
+            return
+        self.push_screen(RemoveContactDialog(target))
+
+    def on_remove_contact_result(self, event: RemoveContactResult) -> None:
+        self.db.remove_contact(event.public_key)
+        self._refresh_sidebar()
+        # Clear chat view if we were viewing that channel
+        screen = self._main_screen
+        if screen.current_target == event.name and not screen.is_dm:
+            screen._current_target = ""
+            screen.query_one("#chat-header").update("Select a channel or contact")
+            screen.message_list.clear_messages()
+        self.notify(f"Removed contact: {event.name} ({event.public_key})")
+
+    
 
     # --- send advert -------------------------------------------------------
 
