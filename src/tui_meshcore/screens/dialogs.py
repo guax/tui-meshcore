@@ -339,7 +339,7 @@ class RemoveContactDialog(ModalScreen):
         with Vertical(id="remove-box"):
             yield Static("Remove Contact", classes="dialog-title")
             yield Static(
-                f"Remove [bold]{self._channel_name}[/]?\nMessage history will be kept.",
+                f"Remove [bold]{self._contact_node_id}[/]?\nMessage history will be kept.",
                 classes="confirm-text",
             )
             with Vertical(classes="button-row"):
