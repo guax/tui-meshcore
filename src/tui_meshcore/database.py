@@ -163,9 +163,9 @@ class DatabaseManager:
         ).fetchone()
         return dict(row) if row else None
 
-    def remove_contact(self, public_key: str) -> None:
+    def remove_contact(self, node_id: str) -> None:
         assert self._conn
-        self._conn.execute("DELETE FROM contacts WHERE public_key = ?", (public_key,))
+        self._conn.execute("DELETE FROM contacts WHERE node_id = ?", (node_id,))
         self._conn.commit()
 
     # --- channels ----------------------------------------------------------
